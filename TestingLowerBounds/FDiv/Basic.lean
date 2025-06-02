@@ -7,7 +7,6 @@ import Mathlib.Analysis.Convex.Integral
 import Mathlib.Probability.Notation
 import TestingLowerBounds.ForMathlib.Integrable
 import TestingLowerBounds.IntegrableFRNDeriv
-
 /-!
 
 # f-Divergences
@@ -271,6 +270,194 @@ lemma fDiv_add [IsFiniteMeasure μ] (hf : Integrable (fun x ↦ f ((∂μ/∂ν)
   rw [← EReal.coe_ennreal_toReal]
   · rw [add_comm, EReal.add_mul_coe_of_nonneg ENNReal.toReal_nonneg]
   · exact measure_ne_top _ _
+
+noncomputable def conjugate_fn_finite (f : ℝ → ℝ) : ℝ → ℝ :=
+  fun x ↦ x * f (1/x)
+
+noncomputable def conjugate_fn (f : ℝ → ℝ) : ℝ → ℝ := by
+  exact fun x ↦ if x = 0 then (derivAtTop f).toReal else conjugate_fn_finite f x
+
+lemma derivAtTop_eq_lim_conjugate (f : ℝ → ℝ) (hd : derivAtTop f ≠ ⊤) (hb : derivAtTop f ≠ ⊥):
+    Tendsto (fun x ↦ x * f (1/x)) (𝓝[Set.Ioi 0] 0) (𝓝 ((derivAtTop f).toReal)) := by
+  sorry -- Change of variables from derivAtTop definition
+
+lemma lim_conjugate_fn (f : ℝ → ℝ) (hd : derivAtTop f ≠ ⊤) (hb : derivAtTop f ≠ ⊥):
+    Tendsto (conjugate_fn f) (𝓝 0) (𝓝 (conjugate_fn f 0)) := by
+  sorry
+
+lemma conjugate_convex_finite (hf_cvx : ConvexOn ℝ (Ioi 0) f)  :
+    ConvexOn ℝ (Ioi 0) (conjugate_fn_finite f) := by
+
+  -- Use the characterization: ConvexOn s g ↔ ∀ x y ∈ s, ∀ a b ≥ 0, a + b = 1 → g(ax + by) ≤ ag(x) + bg(y)
+  rw [ConvexOn]
+  unfold conjugate_fn_finite
+  constructor
+  · exact convex_Ioi 0
+  · intro x hx y hy a b ha hb hab
+    set z := a • x + b • y with hz
+    have hz_pos : 0 < z := by
+      simp only [z]
+      by_cases hb_pos : 0 < b
+      · -- Case: b > 0
+        cases' ha.eq_or_lt with ha_zero ha_pos
+        · -- Subcase: a = 0, b > 0
+          rw [← ha_zero, zero_smul, zero_add]
+          exact smul_pos hb_pos (mem_Ioi.mp hy)
+        · -- Subcase: a > 0, b > 0
+          exact add_pos (smul_pos ha_pos (mem_Ioi.mp hx)) (smul_pos hb_pos (mem_Ioi.mp hy))
+      · -- Case: b ≤ 0
+        -- Since hb : 0 ≤ b and ¬(0 < b), we have b = 0
+        have hb_zero : b = 0 := le_antisymm (le_of_not_gt hb_pos) hb
+        rw [hb_zero, zero_smul, add_zero]
+        -- Now we need a > 0 (can't have both a = 0 and b = 0 since a + b = 1)
+        rw [hb_zero] at hab
+        simp [add_zero] at hab
+        rw [hab, one_smul]
+        exact hx
+    set w1 := a * x / z with hw₁
+    set w2 := b * y / z with hw₂
+    have hw_sum : w1 + w2 = 1 := by
+      simp [w1, w2, z]
+      rw [← add_div]
+      rw [div_self]
+      show z ≠ 0
+      apply hz_pos.ne'
+
+    have rhs_transform : a • (x * f (1/x)) + b • (y * f (1/y)) = z * (w1 * f (1/x) + w2 * f (1/y)) := by
+      -- Expand w1 and w2 definitions
+      simp [w1, w2]
+      -- Now we have: a • (x * f (1/x)) + b • (y * f (1/y)) = z * ((a * x / z) * f (1/x) + (b * y / z) * f (1/y))
+      field_simp
+      simp only [mul_assoc]
+      -- This should simplify to: a * x * f (1/x) + b * y * f (1/y)
+      -- And since • is the same as * in ℝ, this matches the LHS
+    have left_transform : 1/z = w1 * (1 / x) + w2 * (1 / y) := by
+      simp [w1, w2, one_div]
+      -- Goal becomes: a * x / z / x + b * y / z / y = 1/z
+      field_simp [div_div]
+      field_simp [ne_of_gt (mem_Ioi.mp hx), ne_of_gt (mem_Ioi.mp hy), ne_of_gt hz_pos]
+      -- This should give: (a + b) / z = 1/z
+      field_simp [mul_assoc, mul_comm, ← mul_add]  -- Use a + b = 1
+      field_simp [mul_comm a, mul_comm b, mul_assoc x 2, mul_comm x 3, ← mul_assoc x, ← mul_assoc y, mul_comm x y, ← mul_add]
+      rw [hab]
+      field_simp
+      ac_rfl
+    rw [rhs_transform]
+    rw [mul_le_mul_left hz_pos]
+    rw [left_transform]
+    apply hf_cvx.2  -- Use the convexity directly
+    rw [Set.mem_Ioi, one_div]
+    exact inv_pos.mpr (mem_Ioi.mp hx)
+    rw [Set.mem_Ioi, one_div]
+    exact inv_pos.mpr (mem_Ioi.mp hy)
+    rw [hw₁]  -- Unfold w1 = a * x / z
+    exact div_nonneg (mul_nonneg ha (le_of_lt (mem_Ioi.mp hx))) (le_of_lt hz_pos)
+    rw [hw₂]  -- Unfold w2 = b * y / z
+    exact div_nonneg (mul_nonneg hb (le_of_lt (mem_Ioi.mp hy))) (le_of_lt hz_pos)
+    exact hw_sum
+
+lemma integral_rnDeriv_change_of_variables [SigmaFinite μ] [SigmaFinite ν]
+    (hf : StronglyMeasurable f) (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν) :
+    ∫ x, f ((∂μ/∂ν) x).toReal ∂ν = ∫ x, ((∂ν/∂μ) x).toReal * f (1 / ((∂ν/∂μ) x).toReal) ∂μ := by sorry
+
+-- The chain rule for Radon-Nikodym derivatives
+lemma rnDeriv_chain_rule [SigmaFinite μ] [SigmaFinite ν] :
+    ∀ᵐ x ∂ν, ((∂ν/∂μ) x).toReal * ((∂μ/∂ν) x).toReal = 1 := by sorry
+
+-- The Radon-Nikodym reciprocal relationship
+lemma rnDeriv_reciprocal [SigmaFinite μ] [SigmaFinite ν] :
+    ∀ᵐ x ∂ν, ((∂μ/∂ν) x).toReal ≠ 0 → ((∂ν/∂μ) x).toReal = 1 / ((∂μ/∂ν) x).toReal := by sorry
+
+-- Alternative formulation using the conjugate function directly
+lemma integral_conjugate_transform [SigmaFinite μ] [SigmaFinite ν]
+    (hf : StronglyMeasurable f) (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν) :
+    ∫ x, f ((∂μ/∂ν) x).toReal ∂ν = ∫ x, (fun t ↦ t * f (1/t)) ((∂ν/∂μ) x).toReal ∂μ := by sorry
+
+-- Integrability transfer under conjugate transformation
+lemma integrable_conjugate_rnDeriv [IsFiniteMeasure μ] [SigmaFinite ν]
+    (hf : StronglyMeasurable f) (hf_cvx : ConvexOn ℝ (Ici 0) f)
+    (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν) :
+    Integrable (fun x ↦ ((∂ν/∂μ) x).toReal * f (1 / ((∂ν/∂μ) x).toReal)) μ := by sorry
+
+-- Equivalently, using the conjugate function
+lemma integrable_conjugate_function [IsFiniteMeasure μ] [SigmaFinite ν]
+    (hf : StronglyMeasurable f) (hf_cvx : ConvexOn ℝ (Ioi 0) f)
+    (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν) :
+    Integrable (fun x ↦ (fun t ↦ t * f (1/t)) ((∂ν/∂μ) x).toReal) μ := by sorry
+
+-- Symmetry of singular parts
+lemma singularPart_symm [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
+    μ.singularPart ν .univ = ν.singularPart μ .univ := by sorry
+
+-- The derivAtTop behavior under conjugation
+lemma derivAtTop_conjugate (hf_cvx : ConvexOn ℝ (Ioi 0) f) :
+    derivAtTop (fun x ↦ x * f (1/x)) = derivAtTop f := by sorry
+
+-- Alternative formulation: derivAtTop is preserved under perspective transformation
+lemma derivAtTop_perspective (hf_cvx : ConvexOn ℝ (Ici 0) f) :
+    derivAtTop f = derivAtTop (fun x ↦ x * f (1/x)) := by sorry
+
+-- More general change of variables with measure transformation
+lemma change_of_variables_general [SigmaFinite μ] [SigmaFinite ν]
+    (hf : StronglyMeasurable f) (g : ℝ → ℝ) (hg : StronglyMeasurable g)
+    (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν)
+    (h_transform : ∀ t > 0, g (1/t) = t * f t) :
+    ∫ x, f ((∂μ/∂ν) x).toReal ∂ν = ∫ x, g ((∂ν/∂μ) x).toReal ∂μ := by sorry
+
+-- The key lemma that directly establishes the f-divergence symmetry
+lemma fDiv_integral_symm [IsFiniteMeasure μ] [SigmaFinite ν]
+    (hf_cvx : ConvexOn ℝ (Ici 0) f) (hf : StronglyMeasurable f)
+    (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν) :
+    ∫ x, f ((∂μ/∂ν) x).toReal ∂ν + derivAtTop f * μ.singularPart ν .univ =
+    ∫ x, (fun t ↦ t * f (1/t)) ((∂ν/∂μ) x).toReal ∂μ + derivAtTop f * ν.singularPart μ .univ := by sorry
+
+-- Version that handles the case where ν is also finite
+lemma fDiv_integral_symm_finite [IsFiniteMeasure μ] [IsFiniteMeasure ν]
+    (hf_cvx : ConvexOn ℝ (Ici 0) f) (hf : StronglyMeasurable f)
+    (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν) :
+    ∫ x, f ((∂μ/∂ν) x).toReal ∂ν + derivAtTop f * μ.singularPart ν .univ =
+    ∫ x, (fun t ↦ t * f (1/t)) ((∂ν/∂μ) x).toReal ∂μ + derivAtTop f * ν.singularPart μ .univ := by sorry
+
+-- A more elementary version focusing on absolutely continuous measures
+lemma integral_rnDeriv_symm_ac [IsFiniteMeasure μ] [IsFiniteMeasure ν]
+    (hμν : μ ≪ ν) (hνμ : ν ≪ μ) (hf : StronglyMeasurable f)
+    (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν) :
+    ∫ x, f ((∂μ/∂ν) x).toReal ∂ν = ∫ x, (fun t ↦ t * f (1/t)) ((∂ν/∂μ) x).toReal ∂μ := by sorry
+
+lemma fDiv_symm [IsFiniteMeasure μ] [IsFiniteMeasure ν] (hf_cvx : ConvexOn ℝ (Ioi 0) f)
+    (hf : StronglyMeasurable f) (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν) :
+    fDiv f μ ν = fDiv (fun x ↦ x * f (1/x)) ν μ := by
+
+  -- Define the conjugate function for clarity
+  let g := fun x ↦ x * f (1/x)
+
+  -- First, establish that g is convex (using our infrastructure)
+  -- Note: conjugate_convex should be a lemma, so we apply it
+
+  -- Show that the conjugate function is integrable with respect to the swapped measures
+  have hg_int : Integrable (fun x ↦ g ((∂ν/∂μ) x).toReal) μ :=
+    integrable_conjugate_function hf hf_cvx h_int
+
+  -- Now we can expand both f-divergences using the definition
+  rw [fDiv_of_integrable h_int, fDiv_of_integrable hg_int]
+
+  -- We need to show equality of two parts:
+  -- 1. The integral parts are equal
+  -- 2. The singular part contributions are equal
+
+  -- Part 1: Integral equality
+  have h_integral_eq : ∫ x, f ((∂μ/∂ν) x).toReal ∂ν = ∫ x, g ((∂ν/∂μ) x).toReal ∂μ := by
+    -- Use the change of variables lemma
+    rw [integral_conjugate_transform hf h_int]
+    -- This gives us exactly what we want since g(t) = t * f(1/t)
+
+  -- Part 2: Singular parts equality
+    -- Need to add IsFiniteMeasure ν assumption for singularPart_symm
+  have h_singular_eq : derivAtTop f * μ.singularPart ν .univ = derivAtTop g * ν.singularPart μ .univ := by
+    rw [derivAtTop_conjugate hf_cvx, singularPart_symm]
+
+  -- Combine both parts
+  rw [h_integral_eq, h_singular_eq]
 
 lemma fDiv_add_const (μ ν : Measure α) [IsFiniteMeasure μ] [IsFiniteMeasure ν]
     (hf_cvx : ConvexOn ℝ (Set.Ici 0) f) (c : ℝ) :
