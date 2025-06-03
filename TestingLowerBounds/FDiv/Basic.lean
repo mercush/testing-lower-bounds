@@ -308,51 +308,40 @@ lemma conjugate_convex_finite (hf_cvx : ConvexOn ℝ (Ioi 0) f)  :
       · -- Case: b ≤ 0
         -- Since hb : 0 ≤ b and ¬(0 < b), we have b = 0
         have hb_zero : b = 0 := le_antisymm (le_of_not_gt hb_pos) hb
-        rw [hb_zero, zero_smul, add_zero]
         -- Now we need a > 0 (can't have both a = 0 and b = 0 since a + b = 1)
-        rw [hb_zero] at hab
-        simp [add_zero] at hab
-        rw [hab, one_smul]
+        simp [hb_zero, add_zero] at hab
+        rw [hb_zero, zero_smul, add_zero, hab, one_smul]
         exact hx
-    set w1 := a * x / z with hw₁
-    set w2 := b * y / z with hw₂
+    let w1 := a • x / z
+    let w2 := b • y / z
     have hw_sum : w1 + w2 = 1 := by
-      simp [w1, w2, z]
+      simp only [w1, w2, z]
       rw [← add_div]
       rw [div_self]
-      show z ≠ 0
-      apply hz_pos.ne'
+      simp only [← hz]
+      exact hz_pos.ne'
 
     have rhs_transform : a • (x * f (1/x)) + b • (y * f (1/y)) = z * (w1 * f (1/x) + w2 * f (1/y)) := by
-      -- Expand w1 and w2 definitions
-      simp [w1, w2]
-      -- Now we have: a • (x * f (1/x)) + b • (y * f (1/y)) = z * ((a * x / z) * f (1/x) + (b * y / z) * f (1/y))
-      field_simp
+      field_simp [w1, w2]
       simp only [mul_assoc]
-      -- This should simplify to: a * x * f (1/x) + b * y * f (1/y)
-      -- And since • is the same as * in ℝ, this matches the LHS
     have left_transform : 1/z = w1 * (1 / x) + w2 * (1 / y) := by
-      simp [w1, w2, one_div]
-      -- Goal becomes: a * x / z / x + b * y / z / y = 1/z
-      field_simp [div_div]
+      simp [w1, w2, one_div, div_div]
       field_simp [ne_of_gt (mem_Ioi.mp hx), ne_of_gt (mem_Ioi.mp hy), ne_of_gt hz_pos]
-      -- This should give: (a + b) / z = 1/z
       field_simp [mul_assoc, mul_comm, ← mul_add]  -- Use a + b = 1
       field_simp [mul_comm a, mul_comm b, mul_assoc x 2, mul_comm x 3, ← mul_assoc x, ← mul_assoc y, mul_comm x y, ← mul_add]
-      rw [hab]
-      field_simp
+      rw [hab, mul_one]
       ac_rfl
     rw [rhs_transform]
     rw [mul_le_mul_left hz_pos]
     rw [left_transform]
-    apply hf_cvx.2  -- Use the convexity directly
+    apply hf_cvx.right  -- Use the convexity directly
     rw [Set.mem_Ioi, one_div]
     exact inv_pos.mpr (mem_Ioi.mp hx)
     rw [Set.mem_Ioi, one_div]
     exact inv_pos.mpr (mem_Ioi.mp hy)
-    rw [hw₁]  -- Unfold w1 = a * x / z
+    unfold w1  -- Unfold w1 = a * x / z
     exact div_nonneg (mul_nonneg ha (le_of_lt (mem_Ioi.mp hx))) (le_of_lt hz_pos)
-    rw [hw₂]  -- Unfold w2 = b * y / z
+    unfold w2  -- Unfold w2 = b * y / z
     exact div_nonneg (mul_nonneg hb (le_of_lt (mem_Ioi.mp hy))) (le_of_lt hz_pos)
     exact hw_sum
 
