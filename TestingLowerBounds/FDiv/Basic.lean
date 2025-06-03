@@ -356,6 +356,68 @@ lemma conjugate_convex_finite (hf_cvx : ConvexOn ℝ (Ioi 0) f)  :
     exact div_nonneg (mul_nonneg hb (le_of_lt (mem_Ioi.mp hy))) (le_of_lt hz_pos)
     exact hw_sum
 
+lemma conjugate_convex (hf_cvx : ConvexOn ℝ (Ici 0) f)  :
+    ConvexOn ℝ (Ici 0) (conjugate_fn f) := by
+  rw [ConvexOn]
+  unfold conjugate_fn
+  constructor
+  · exact convex_Ici 0
+  · intro x hx y hy a b ha hb hab
+    -- We need to prove: conjugate_fn f (a • x + b • y) ≤ a • conjugate_fn f x + b • conjugate_fn f y
+
+    -- Case analysis on whether x and y are zero
+    by_cases hx_zero : x = 0
+    · by_cases hy_zero : y = 0
+      · -- Case: both x = 0 and y = 0
+        simp [hx_zero, hy_zero, zero_smul]
+        rw [← add_mul, hab, one_mul]
+
+      · -- Case: x = 0, y > 0
+        have hy_pos : 0 < y := lt_of_le_of_ne (mem_Ici.mp hy) (Ne.symm hy_zero)
+
+        simp [hx_zero, hy_zero]
+
+        -- We have: conjugate_fn f (b • y) ≤ a • (derivAtTop f).toReal + b • conjugate_fn f y
+        -- Since conjugate_fn f (b • y) = if b • y = 0 then (derivAtTop f).toReal else (b • y) * f (1 / (b • y))
+
+        by_cases hb_zero : b = 0
+        · -- If b = 0, then b • y = 0
+          rw [hb_zero, add_zero] at hab
+          simp [hb_zero, hab]
+
+        · -- If b ≠ 0, then b • y ≠ 0 (since y > 0)
+          simp [hb_zero]
+          sorry
+
+    · -- Case: x > 0
+      have hx_pos : 0 < x := lt_of_le_of_ne (mem_Ici.mp hx) (Ne.symm hx_zero)
+
+      by_cases hy_zero : y = 0
+      · sorry
+
+      · -- Case: both x > 0 and y > 0
+        have hy_pos : 0 < y := lt_of_le_of_ne (mem_Ici.mp hy) (Ne.symm hy_zero)
+
+        -- Both x and y are positive, so conjugate_fn f reduces to conjugate_fn_finite f
+        simp [hx_zero, hy_zero]
+
+        -- The sum a • x + b • y is also positive
+        have hsum_pos : 0 < a • x + b • y := by
+          cases' ha.eq_or_lt with ha_zero ha_pos
+          · rw [← ha_zero, zero_smul, zero_add]
+            rw [← ha_zero, zero_add] at hab
+            rw [hab, one_smul]
+            exact hy_pos
+          · exact add_pos_of_pos_of_nonneg (smul_pos ha_pos hx_pos) (smul_nonneg hb (le_of_lt hy_pos))
+
+        have hsum_ne_zero : a * x + b * y ≠ 0 := ne_of_gt hsum_pos
+        simp [hsum_ne_zero]
+
+        -- Now we can use the convexity result for conjugate_fn_finite
+        have h_convex := conjugate_convex_finite (hf_cvx.subset (Set.Ioi_subset_Ici_self) (convex_Ioi 0))
+        exact h_convex.2 (mem_Ioi.mpr hx_pos) (mem_Ioi.mpr hy_pos) ha hb hab
+
+
 lemma integral_rnDeriv_change_of_variables [SigmaFinite μ] [SigmaFinite ν]
     (hf : StronglyMeasurable f) (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν) :
     ∫ x, f ((∂μ/∂ν) x).toReal ∂ν = ∫ x, ((∂ν/∂μ) x).toReal * f (1 / ((∂ν/∂μ) x).toReal) ∂μ := by sorry
