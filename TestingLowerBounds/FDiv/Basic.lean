@@ -286,7 +286,7 @@ lemma lim_conjugate_fn (f : ℝ → ℝ) (hd : derivAtTop f ≠ ⊤) (hb : deriv
     Tendsto (conjugate_fn f) (𝓝[>] 0) (𝓝 (conjugate_fn f 0)) := by
   sorry
 
-lemma conjugate_fn_continuous (f : ℝ → ℝ) (hd : derivAtTop f ≠ ⊤) (hb : derivAtTop f ≠ ⊥) :
+lemma conjugate_fn_continuous (f : ℝ → ℝ) (hd : derivAtTop f ≠ ⊤) (hb : derivAtTop f ≠ ⊥) (hf_cont : ContinuousOn f (Ici 0)) :
     ContinuousOn (conjugate_fn f) (Ici 0) := by
   sorry
 
@@ -356,150 +356,98 @@ lemma conjugate_convex (hf_cvx : ConvexOn ℝ (Ici 0) f) (hf_cont : ContinuousOn
   constructor
   · exact convex_Ici 0
   · intro x hx y hy a b ha hb0 hab
-    -- We need to prove: conjugate_fn f (a • x + b • y) ≤ a • conjugate_fn f x + b • conjugate_fn f y
+
+    have convex_on_Ioi (x : ℝ) (hx : 0 < x) (y : ℝ) (hy : 0 < y) (a : ℝ) (b : ℝ) (ha : 0 ≤ a)
+      (hb : 0 ≤ b) (hab : a + b = 1) :
+      conjugate_fn f (a • x + b • y) ≤ a • conjugate_fn f x + b • conjugate_fn f y := by
+
+      have h2 : ∀ r > 0, conjugate_fn f r = conjugate_fn_finite f r := by
+        intro r hr
+        unfold conjugate_fn
+        simp [hr.ne']
+
+      have h_sum_pos : 0 < a • x + b • y := by
+        by_cases hb_zero : b = 0
+        ·
+          rw [hb_zero, add_zero] at hab
+          rw [hb_zero, zero_smul, add_zero, hab, one_smul]
+          exact hx
+        ·
+          exact lt_add_of_le_of_pos (smul_nonneg ha (hx.le))
+            (smul_pos (lt_of_le_of_ne' hb hb_zero) hy)
+
+      rw [h2 (a • x + b • y) h_sum_pos, h2 x hx, h2 y hy]
+
+      have h_conv_finite := conjugate_convex_finite (hf_cvx.subset (Set.Ioi_subset_Ici_self) (convex_Ioi 0))
+      exact h_conv_finite.2 (mem_Ioi.mpr hx) (mem_Ioi.mpr hy) ha hb hab
+
     have main_claim (x : ℝ) (hx : x ∈ Ici 0) (y : ℝ) (hy : y ∈ Ici 0) (a : ℝ) (ha : 0 ≤ a) (b : ℝ) (hb0 : 0 ≤ b)
         (hab : a + b = 1) (hx_zero : x = 0) (hy_zero : y ≠ 0) : (conjugate_fn f (a • x + b • y) ≤ a • conjugate_fn f x + b • conjugate_fn f y) := by
       have hy_pos : 0 < y := lt_of_le_of_ne (mem_Ici.mp hy) (Ne.symm hy_zero)
       unfold conjugate_fn
       simp [hx_zero, hy_zero]
 
-      -- We have: conjugate_fn f (b • y) ≤ a • (derivAtTop f).toReal + b • conjugate_fn f y
-      -- Since conjugate_fn f (b • y) = if b • y = 0 then (derivAtTop f).toReal else (b • y) * f (1 / (b • y))
-
       by_cases hb_zero : b = 0
-      · -- If b = 0, then b • y = 0
+      ·
         rw [hb_zero, add_zero] at hab
         simp [hb_zero, hab]
 
-      · -- If b ≠ 0, then b • y ≠ 0 (since y > 0)
+      ·
         have hby_pos : 0 < b • y := smul_pos (by positivity) hy_pos
         have hby_ne_zero : b • y ≠ 0 := ne_of_gt hby_pos
         simp [hby_ne_zero, hb_zero]
         have h_bound : (b • y) * f (1 / (b • y)) ≤ b • (y * f (1 / y)) + a • (derivAtTop f).toReal := by
-          -- Since x = 0, we're looking at the convexity inequality:
-          -- conjugate_fn f (a•0 + b•y) ≤ a•conjugate_fn f (0) + b•conjugate_fn f (y)
-          -- which simplifies to: conjugate_fn f (b•y) ≤ a•(derivAtTop f).toReal + b•conjugate_fn f (y)
 
-          -- Use the fact that conjugate_fn f (b•y) = (b•y) * f (1/(b•y)) since b•y > 0
-          have h1 : conjugate_fn f (b • y) = (b • y) * f (1 / (b • y)) := by
+          have h1 : (r : ℝ) → (hr : r ≠ 0) → conjugate_fn f r = r * f (1 / r) := by
+            intro r hr
             unfold conjugate_fn
-            simp [hby_ne_zero]
-            unfold conjugate_fn_finite
-            field_simp [hb_zero, hy_zero]
-            ring_nf
-
-          -- Use the fact that conjugate_fn f (y) = y * f (1/y) since y > 0
-          have h2 : conjugate_fn f y = y * f (1 / y) := by
-            unfold conjugate_fn
-            simp [hy_zero]
+            simp [hr]
             unfold conjugate_fn_finite
             field_simp
 
-          -- Use the fact that conjugate_fn f (0) = (derivAtTop f).toReal by definition
           have h3 : conjugate_fn f 0 = (derivAtTop f).toReal := by
             unfold conjugate_fn
             simp
 
-          -- Apply the main convexity inequality
           have h_main : conjugate_fn f (b • y) ≤ a • conjugate_fn f 0 + b • conjugate_fn f y := by
-            -- This is the convexity inequality: conjugate_fn f (a•0 + b•y) ≤ a•conjugate_fn f (0) + b•conjugate_fn f (y)
-            -- simp only [zero_smul, zero_add]
 
-            -- Since we have hx : x ∈ Ici 0 and hx_zero : x = 0, we have 0 ∈ Ici 0
-            have h0_mem : (0 : ℝ) ∈ Ici 0 := by simp [mem_Ici]
-
-            -- Use the epsilon argument: for small ε > 0, apply convexity to (ε, y)
             have h_eps : ∀ ε > 0, conjugate_fn f (a • ε + b • y) ≤ a • conjugate_fn f ε + b • conjugate_fn f y := by
               intro ε hε
-              -- Apply the already proven case where both points are positive
-              have hε_mem : ε ∈ Ici 0 := mem_Ici.mpr (le_of_lt hε)
-              have hε_ne_zero : ε ≠ 0 := ne_of_gt hε
-              have hy_ne_zero : y ≠ 0 := hy_zero
-
-              -- Since both ε > 0 and y > 0, conjugate_fn reduces to conjugate_fn_finite
-              have h_eps_pos : conjugate_fn f ε = conjugate_fn_finite f ε := by
-                unfold conjugate_fn
-                simp [hε_ne_zero]
-
-              have h_y_pos : conjugate_fn f y = conjugate_fn_finite f y := by
-                unfold conjugate_fn
-                simp [hy_ne_zero]
-
-              have h_sum_pos : 0 < a • ε + b • y := by positivity
-
-              have h_sum_ne_zero : a • ε + b • y ≠ 0 := ne_of_gt h_sum_pos
-
-              have h_sum_conv : conjugate_fn f (a • ε + b • y) = conjugate_fn_finite f (a • ε + b • y) := by
-                unfold conjugate_fn
-                simp [h_sum_ne_zero]
-                intro h_sum_eq_zero
-                exact (h_sum_ne_zero h_sum_eq_zero).elim
-
-              -- Now apply the convexity of conjugate_fn_finite on (0, ∞)
-              rw [h_sum_conv, h_eps_pos, h_y_pos]
-
-              -- Use the already proven convexity for positive points
-              have h_conv_finite := conjugate_convex_finite (hf_cvx.subset (Set.Ioi_subset_Ici_self) (convex_Ioi 0))
-              exact h_conv_finite.2 (mem_Ioi.mpr hε) (mem_Ioi.mpr hy_pos) ha hb0 hab
-            -- Take the limit as ε → 0⁺ using continuity of f
+              exact convex_on_Ioi ε hε y hy_pos a b ha hb0 hab
             have h_lim : Tendsto (fun ε => conjugate_fn f (a • ε + b • y)) (𝓝[>] 0) (𝓝 (conjugate_fn f (b • y))) := by
-              -- As ε → 0⁺, we have a • ε + b • y → b • y
-              have h_seq_lim : Tendsto (fun ε => a • ε + b • y) (𝓝[>] 0) (𝓝 (b • y)) := by
-                -- Break down: a • ε → 0 and b • y → b • y
-                have h1 : Tendsto (fun (ε : ℝ)=> a • ε) (𝓝[>] 0) (𝓝 0) := by
-                  cases' ha.eq_or_lt with ha_zero ha_pos
-                  · -- Case a = 0: a • ε = 0 for all ε
-                    rw [← ha_zero]
-                    simp only [zero_smul]
-                    exact tendsto_const_nhds
-                  · show Tendsto (fun ε ↦ a * id ε) (𝓝[>] 0) (𝓝 0)
-                    have h_final : Tendsto (fun k ↦ a * id k) (𝓝[>] 0) (𝓝 (a * 0)) := tendsto_nhdsWithin_of_tendsto_nhds (tendsto_id.const_mul a)
-                    rw [mul_zero] at h_final
-                    exact h_final
-                have h2 : Tendsto (fun (ε : ℝ) => b • y) (𝓝[>] 0) (𝓝 (b • y)) := tendsto_const_nhds
-
-                nth_rewrite 2 [← zero_add (b • y)]
-                exact h1.add h2
-
-
-              -- Use continuity of conjugate_fn at the positive point b • y
-              -- Since b • y > 0, conjugate_fn is continuous there
-              have h_cont_at : ContinuousAt (conjugate_fn f) (b • y) := by
-                exact (conjugate_fn_continuous f hd hb).continuousAt (Ici_mem_nhds (by positivity))
-
-              -- Apply composition of continuous functions
+              have h_cont : Continuous (fun x => a • x + b • y) := Continuous.add (continuous_const_smul a) (continuous_const)
+              have h_cont2 :  ContinuousAt (fun x => a • x + b • y) 0 := h_cont.continuousAt
+              unfold ContinuousAt at h_cont2
+              simp at h_cont2
+              have h_seq_lim : Tendsto (fun ε => a • ε + b • y) (𝓝[>] 0) (𝓝 (b • y)) :=
+                tendsto_nhdsWithin_of_tendsto_nhds h_cont2
+              have h_cont_at : ContinuousAt (conjugate_fn f) (b • y) :=
+                (conjugate_fn_continuous f hd hb hf_cont).continuousAt (Ici_mem_nhds (by positivity))
               exact Tendsto.comp h_cont_at h_seq_lim
 
             have h_lim_rhs : Tendsto (fun ε => a • conjugate_fn f ε + b • conjugate_fn f y) (𝓝[>] 0)
               (𝓝 (a • conjugate_fn f 0 + b • conjugate_fn f y)) := by
-              -- Use that conjugate_fn f ε → conjugate_fn f 0 = (derivAtTop f).toReal as ε → 0⁺
-              -- This follows from the definition of derivAtTop and continuity of f
               have h_lim_conj : Tendsto (fun ε => conjugate_fn f ε) (𝓝[>] 0) (𝓝 (conjugate_fn f 0)) := by
-                -- This is essentially the definition of derivAtTop combined with hf_cont
                 exact lim_conjugate_fn f hd hb
               exact (Tendsto.const_smul h_lim_conj a).add tendsto_const_nhds
 
-            -- Use that inequalities are preserved under limits
-            exact le_of_tendsto_of_tendsto h_lim h_lim_rhs
-              (eventually_nhdsWithin_of_forall (fun ε hε => h_eps ε hε))
-          -- Substitute and rearrange
-          rw [h1, h2, h3] at h_main
+            exact le_of_tendsto_of_tendsto h_lim h_lim_rhs (eventually_nhdsWithin_of_forall h_eps)
+          rw [h1 y (hy_zero), h1 (b • y)  hby_pos.ne', h3] at h_main
           rw [add_comm] at h_main
           exact h_main
         rw [add_comm]
         exact h_bound
 
-    -- Case analysis on whether x and y are zero
     by_cases hx_zero : x = 0
     · by_cases hy_zero : y = 0
-      · -- Case: both x = 0 and y = 0
+      ·
         simp [hx_zero, hy_zero, zero_smul]
         rw [← add_mul, hab, one_mul]
 
-      · -- Case: x = 0, y > 0
+      ·
         exact main_claim x hx y hy a ha b hb0 hab hx_zero hy_zero
 
-    · -- Case: x > 0
+    ·
       have hx_pos : 0 < x := lt_of_le_of_ne (mem_Ici.mp hx) (Ne.symm hx_zero)
 
       by_cases hy_zero : y = 0
@@ -508,27 +456,9 @@ lemma conjugate_convex (hf_cvx : ConvexOn ℝ (Ici 0) f) (hf_cont : ContinuousOn
         rw [add_comm, add_comm (a • conjugate_fn f x)]
         exact convexity
 
-      · -- Case: both x > 0 and y > 0
+      ·
         have hy_pos : 0 < y := lt_of_le_of_ne (mem_Ici.mp hy) (Ne.symm hy_zero)
-        unfold conjugate_fn
-        -- Both x and y are positive, so conjugate_fn f reduces to conjugate_fn_finite f
-        simp [hx_zero, hy_zero]
-
-        -- The sum a • x + b • y is also positive
-        have hsum_pos : 0 < a • x + b • y := by
-          cases' ha.eq_or_lt with ha_zero ha_pos
-          · rw [← ha_zero, zero_smul, zero_add]
-            rw [← ha_zero, zero_add] at hab
-            rw [hab, one_smul]
-            exact hy_pos
-          · exact add_pos_of_pos_of_nonneg (smul_pos ha_pos hx_pos) (smul_nonneg hb0 (le_of_lt hy_pos))
-
-        have hsum_ne_zero : a * x + b * y ≠ 0 := ne_of_gt hsum_pos
-        simp [hsum_ne_zero]
-
-        -- Now we can use the convexity result for conjugate_fn_finite
-        have h_convex := conjugate_convex_finite (hf_cvx.subset (Set.Ioi_subset_Ici_self) (convex_Ioi 0))
-        exact h_convex.2 (mem_Ioi.mpr hx_pos) (mem_Ioi.mpr hy_pos) ha hb0 hab
+        exact convex_on_Ioi x hx_pos y hy_pos a b ha hb0 hab
 
 
 lemma integral_rnDeriv_change_of_variables [SigmaFinite μ] [SigmaFinite ν]
@@ -556,7 +486,7 @@ lemma integrable_conjugate_rnDeriv [IsFiniteMeasure μ] [SigmaFinite ν]
 
 -- Equivalently, using the conjugate function
 lemma integrable_conjugate_function [IsFiniteMeasure μ] [SigmaFinite ν]
-    (hf : StronglyMeasurable f) (hf_cvx : ConvexOn ℝ (Ioi 0) f)
+    (hf : StronglyMeasurable f) (hf_cvx : ConvexOn ℝ (Ici 0) f)
     (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν) :
     Integrable (fun x ↦ (fun t ↦ t * f (1/t)) ((∂ν/∂μ) x).toReal) μ := by sorry
 
@@ -565,7 +495,7 @@ lemma singularPart_symm [IsFiniteMeasure μ] [IsFiniteMeasure ν] :
     μ.singularPart ν .univ = ν.singularPart μ .univ := by sorry
 
 -- The derivAtTop behavior under conjugation
-lemma derivAtTop_conjugate (hf_cvx : ConvexOn ℝ (Ioi 0) f) :
+lemma derivAtTop_conjugate (hf_cvx : ConvexOn ℝ (Ici 0) f) :
     derivAtTop (fun x ↦ x * f (1/x)) = derivAtTop f := by sorry
 
 -- Alternative formulation: derivAtTop is preserved under perspective transformation
@@ -599,7 +529,7 @@ lemma integral_rnDeriv_symm_ac [IsFiniteMeasure μ] [IsFiniteMeasure ν]
     (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν) :
     ∫ x, f ((∂μ/∂ν) x).toReal ∂ν = ∫ x, (fun t ↦ t * f (1/t)) ((∂ν/∂μ) x).toReal ∂μ := by sorry
 
-lemma fDiv_symm [IsFiniteMeasure μ] [IsFiniteMeasure ν] (hf_cvx : ConvexOn ℝ (Ioi 0) f)
+lemma fDiv_symm [IsFiniteMeasure μ] [IsFiniteMeasure ν] (hf_cvx : ConvexOn ℝ (Ici 0) f)
     (hf : StronglyMeasurable f) (h_int : Integrable (fun x ↦ f ((∂μ/∂ν) x).toReal) ν) :
     fDiv f μ ν = fDiv (fun x ↦ x * f (1/x)) ν μ := by
 
