@@ -48,19 +48,59 @@ lemma conjFnContinuous (f : DivFunction):
 
       rw [continuousAt_congr h_eq]
 
-      -- Now prove y * f y⁻¹ is continuous at x
-      -- apply?
-      apply ENNReal.Tendsto.mul
-      · -- 1. Identity function y ↦ y is continuous
-        exact continuousAt_id
-      · -- 2. Composition: y ↦ f y⁻¹ is continuous
-        simp [hx]
-      · apply Tendsto.comp
-        . exact f.continuous.continuousAt.tendsto
-        · exact ContinuousAt.inv continuousAt_id
-      · sorry
-
-
+      -- Two cases:
+      -- · f 0 = 0
+      --   Then f is constant 0 before 1
+      --   Constant function is continuous
+      -- · f 0 ≠ 0
+      by_cases hf_zero : f 0 ≠ 0
+      · apply ENNReal.Tendsto.mul
+        · -- 1. Identity function y ↦ y is continuous
+          exact continuousAt_id
+        · -- 2. Composition: y ↦ f y⁻¹ is continuous
+          simp [hx]
+        · apply Tendsto.comp
+          . exact f.continuous.continuousAt.tendsto
+          · exact ContinuousAt.inv continuousAt_id
+        · by_cases hx_inf : x ≠ ⊤
+          · exact Or.inr hx_inf
+          · simp at hx_inf
+            rw [hx_inf]
+            rw [ENNReal.inv_top]
+            exact Or.inl hf_zero
+      · simp at hf_zero;
+        have h := antitoneOn f
+        rw [AntitoneOn] at h
+        by_cases hx_one : x ≤ 1
+        · apply ENNReal.Tendsto.mul
+          · -- 1. Identity function y ↦ y is continuous
+            exact continuousAt_id
+          · -- 2. Composition: y ↦ f y⁻¹ is continuous
+            simp [hx]
+          · apply Tendsto.comp
+            . exact f.continuous.continuousAt.tendsto
+            · exact ContinuousAt.inv continuousAt_id
+          · have hx_inf : x < ⊤ := lt_of_le_of_lt hx_one ENNReal.one_lt_top
+            exact Or.inr hx_inf.ne
+        ·
+          simp at hx_one
+          have antitone := antitoneOn f
+          rw [AntitoneOn] at antitone
+          have f_zero_on_unit : ∀ y ∈ Set.Iio 1, f y = 0 := by
+            intro y hy
+            have h_antitone: f y ≤ f 0 := antitone (mem_Iic.mpr (zero_le_one' ℝ≥0∞)) (mem_Iic_of_Iio hy) (zero_le y)
+            rw [hf_zero] at h_antitone
+            exact nonpos_iff_eq_zero.mp h_antitone
+          have h_zero : (fun y ↦ y * f y⁻¹) =ᶠ[𝓝 x] fun _ ↦ 0 := by
+            filter_upwards [isOpen_Ioi.mem_nhds hx_one] with y hy
+            have y_inv_lt_one : y⁻¹ < 1 := by
+              rw [ENNReal.inv_lt_one]
+              exact hy
+            have y_inv_in_domain : y⁻¹ ∈ Set.Iio 1 := y_inv_lt_one
+            rw [f_zero_on_unit (y⁻¹) y_inv_in_domain, mul_zero]
+          rw [continuousAt_congr h_zero]
+          exact continuousAt_const
+        -- use monotonicity, simp, const_mul
 
 lemma conjFnConvexIoi (f : DivFunction)  :
     ConvexOn ℝ≥0 (Ioi 0) (conjFn f) := by
