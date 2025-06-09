@@ -27,12 +27,39 @@ noncomputable
 def conjFn (f : DivFunction) :=
   (fun x ↦ if x = 0 then f.derivAtTop else x * f x⁻¹)
 
-lemma limConjugateFn (f : DivFunction):
-    Tendsto (conjFn f) (𝓝[>] 0) (𝓝 (conjFn f 0)) := by
+lemma ConjugateFnContinuousAt (f : DivFunction):
+    ContinuousAt (conjFn f) 0 := by
   sorry
 
 lemma conjFnContinuous (f : DivFunction):
-    Continuous (conjFn f) := by sorry
+    Continuous (conjFn f) := by
+    rw [continuous_iff_continuousAt]
+    intro x
+    by_cases hx : x = 0
+    · rw [hx]; exact ConjugateFnContinuousAt f
+    ·
+      have hx_pos : 0 < x := lt_of_le_of_ne (zero_le x) (Ne.symm hx)
+
+      -- On a neighborhood of x, conjFn f y = y * f y⁻¹
+      have h_eq : conjFn f =ᶠ[𝓝 x] fun y ↦ y * f y⁻¹ := by
+        filter_upwards [isOpen_Ioi.mem_nhds hx_pos] with y hy
+        unfold conjFn
+        simp [hy.ne']
+
+      rw [continuousAt_congr h_eq]
+
+      -- Now prove y * f y⁻¹ is continuous at x
+      -- apply?
+      apply ENNReal.Tendsto.mul
+      · -- 1. Identity function y ↦ y is continuous
+        exact continuousAt_id
+      · -- 2. Composition: y ↦ f y⁻¹ is continuous
+        simp [hx]
+      · apply Tendsto.comp
+        . exact f.continuous.continuousAt.tendsto
+        · exact ContinuousAt.inv continuousAt_id
+      · sorry
+
 
 
 lemma conjFnConvexIoi (f : DivFunction)  :
@@ -314,7 +341,7 @@ lemma conjFnConvex (f : DivFunction):
             have h_lim_rhs : Tendsto (fun ε => a • f.conjFn ε + b • f.conjFn y) (𝓝[>] 0)
               (𝓝 (a • f.conjFn 0 + b • f.conjFn y)) := by
               have h_lim_conj : Tendsto (fun ε => f.conjFn ε) (𝓝[>] 0) (𝓝 (f.conjFn 0)) := by
-                exact limConjugateFn f
+                exact (ConjugateFnContinuousAt f).tendsto.mono_left nhdsWithin_le_nhds
               have h : Continuous (fun ε ↦ a • ε + b • f.conjFn y) := (ENNReal.continuous_const_mul ENNReal.coe_lt_top.ne).add continuous_const
               exact h.continuousAt.tendsto.comp h_lim_conj
 
