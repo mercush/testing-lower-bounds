@@ -9,6 +9,7 @@ import TestingLowerBounds.ForMathlib.Integrable
 import TestingLowerBounds.IntegrableFRNDeriv
 import TestingLowerBounds.FDiv.DivFunction.OfReal
 import TestingLowerBounds.FDiv.DivFunction.Conj
+import TestingLowerBounds.FDiv.DivFunction.DerivAtTop
 import TestingLowerBounds.ForMathlib.RadonNikodym
 
 /-!
@@ -786,6 +787,65 @@ since then it is true that `derivAtTop` is monotone. -/
 lemma fDiv_mono' (hfg : ∀ x, f x ≤ g x) (hfg' : f.derivAtTop ≤ g.derivAtTop) :
     fDiv f μ ν ≤ fDiv g μ ν :=
   fDiv_mono'' (.of_forall hfg) hfg'
+
+lemma continuous_ae_le_imp_le {f g : DivFunction} (h_ae : f ≤ᵐ[ν.map (∂μ/∂ν)] g) :
+    f.toFun ≤ g.toFun := by sorry
+  -- intro x
+  -- -- Prove by contradiction
+  -- by_contra h_not
+  -- push_neg at h_not
+  -- -- So we have f(x) > g(x)
+  -- have h_pos : 0 < f x - g x := sub_pos.mpr h_not
+
+  -- -- By continuity, f - g is continuous
+  -- have h_cont : Continuous (f - g) := hf.sub hg
+
+  -- -- Find an open neighborhood where f - g > 0
+  -- obtain ⟨U, hU_open, hx_mem, hU_pos⟩ :=
+  --   isOpen_compl_zeros_of_continuous h_cont ⟨x, h_pos.ne'⟩
+
+  -- -- This neighborhood has positive measure
+  -- have hU_meas : 0 < μ U := IsOpenPosMeasure.open_pos hU_open ⟨x, hx_mem⟩
+
+  -- -- But on this set, f > g, contradicting the ae inequality
+  -- have h_contra : ∀ y ∈ U, g y < f y := fun y hy => by
+  --   have : (f - g) y ≠ 0 := hU_pos hy
+  --   have : 0 ≤ (f - g) y := by
+  --     by_contra h_neg
+  --     push_neg at h_neg
+  --     -- This would contradict h_ae on the set U which has positive measure
+  --     have : f y < g y := by linarith [h_neg]
+  --     -- Extract contradiction from ae inequality
+  --     sorry
+  --   linarith [this, this.lt_of_ne this.symm]
+
+  -- -- This contradicts f ≤ g almost everywhere since U has positive measure
+  -- have h_meas_contra : μ {y | g y < f y} > 0 := by
+  --   refine lt_of_lt_of_le hU_meas ?_
+  --   exact measure_mono (fun y hy => h_contra y hy)
+
+  -- -- But f ≤ g ae means μ {y | g y < f y} = 0
+  -- have h_ae_zero : μ {y | g y < f y} = 0 := by
+  --   have : {y | g y < f y} = {y | ¬ f y ≤ g y} := by ext; simp [not_le]
+  --   rw [this]
+  --   exact measure_zero_of_ae_nmem h_ae
+
+  -- linarith [h_meas_contra, h_ae_zero]
+
+lemma derivAtTop_mono (hfg : f ≤ᵐ[ν.map (∂μ/∂ν)] g) : f.derivAtTop ≤ g.derivAtTop := by
+  have h_le : f.toFun ≤ g.toFun := continuous_ae_le_imp_le hfg
+  have hf : Tendsto (fun x ↦ f x / x) atTop (𝓝 f.derivAtTop) := DivFunction.tendsto_derivAtTop
+  have hg : Tendsto (fun x ↦ g x / x) atTop (𝓝 g.derivAtTop) := DivFunction.tendsto_derivAtTop
+  have h_le : ∀ᶠ x in atTop, f x / x ≤ g x / x := by
+    rw [eventually_atTop]
+    use 1
+    intro x _
+    exact ENNReal.div_le_div_right (h_le x) x
+  exact le_of_tendsto_of_tendsto hf hg h_le
+
+lemma fDiv_mono (hfg : f ≤ᵐ[ν.map (∂μ/∂ν)] g) : fDiv f μ ν ≤ fDiv g μ ν := by
+  have hd : f.derivAtTop ≤ g.derivAtTop := derivAtTop_mono hfg
+  exact fDiv_mono'' hfg hd
 
 -- lemma fDiv_nonneg_of_nonneg (hf : ∀ x, 0 ≤ f x) : 0 ≤ fDiv f μ ν :=
 --   fDiv_zero μ ν ▸ fDiv_mono' hf (DivFunction.derivAtTop_zero ▸ zero_le')

@@ -443,7 +443,45 @@ lemma eq_zero_iff {a b : ℝ} (ha : a < 1) (hb : 1 < b)
 
 end RealFun
 
-lemma monotoneOn (f : DivFunction) : MonotoneOn f (Ici 1) := sorry
+lemma monotoneOn (f : DivFunction) : MonotoneOn f (Ici 1) := by sorry
+  -- intro x hx y hy hxy
+  -- -- hx : 1 ≤ x, hy : 1 ≤ y, hxy : x ≤ y
+  -- -- Goal: f x ≤ f y
+
+  -- -- Case 1: x = 1
+  -- if h : x = 1 then
+  --   rw [h, f.one]  -- f 1 = 0
+  --   exact f.nonneg y  -- f y ≥ 0
+
+  -- -- Case 2: 1 < x ≤ y
+  -- else
+  --   have hx_pos : 1 < x := lt_of_le_of_ne hx (Ne.symm h)
+
+  --   -- Express x as convex combination of 1 and y
+  --   let t := (y - x) / (y - 1)
+  --   have hy_pos : 1 < y := hx_pos.trans_le hxy
+  --   have denom_pos : 0 < y - 1 := sub_pos.mpr hy_pos
+
+  --   have ht_mem : t ∈ Icc 0 1 := by
+  --     constructor
+  --     · exact div_nonneg (sub_nonneg.mpr hxy) (le_of_lt denom_pos)
+  --     · rw [div_le_one_iff]
+  --       left
+  --       exact ⟨sub_le_sub_right (le_of_lt hx_pos) _, denom_pos⟩
+
+  --   have hx_eq : x = t * 1 + (1 - t) * y := by
+  --     field_simp [ne_of_gt denom_pos]
+  --     ring
+
+  --   -- Apply convexity
+  --   calc f x
+  --   _ = f (t * 1 + (1 - t) * y) := by rw [hx_eq]
+  --   _ ≤ t * f 1 + (1 - t) * f y := f.convexOn.2 (by simp) hy t (1 - t) ht_mem.1
+  --                                   (sub_nonneg.mpr ht_mem.2) (by simp)
+  --   _ = t * 0 + (1 - t) * f y := by rw [f.one]
+  --   _ = (1 - t) * f y := by simp
+  --   _ ≤ f y := by exact mul_le_of_le_one_left (f.nonneg _)
+  --                  (sub_le_self _ ht_mem.1)
 
 lemma antitoneOn (f : DivFunction) : AntitoneOn f (Iic 1) := sorry
 
