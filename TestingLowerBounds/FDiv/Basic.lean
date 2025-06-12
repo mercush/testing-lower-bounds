@@ -788,52 +788,48 @@ lemma fDiv_mono' (hfg : ∀ x, f x ≤ g x) (hfg' : f.derivAtTop ≤ g.derivAtTo
     fDiv f μ ν ≤ fDiv g μ ν :=
   fDiv_mono'' (.of_forall hfg) hfg'
 
-lemma continuous_ae_le_imp_le {f g : DivFunction} (h_ae : f ≤ᵐ[ν.map (∂μ/∂ν)] g) :
-    f.toFun ≤ g.toFun := by sorry
-  -- intro x
-  -- -- Prove by contradiction
-  -- by_contra h_not
-  -- push_neg at h_not
-  -- -- So we have f(x) > g(x)
-  -- have h_pos : 0 < f x - g x := sub_pos.mpr h_not
+lemma continuous_ae_le_iff_le  [Measure.IsOpenPosMeasure (ν.map (∂μ/∂ν))] {f g : DivFunction} :
+  (f ≤ᵐ[ν.map (∂μ/∂ν)] g) ↔ (f.toFun ≤ g.toFun) := by
+  constructor
+  swap
+  · intro leq
+    exact ae_of_all _ leq
+  · intro h_leq x
+    by_contra h_not
+    push_neg at h_not
+    -- So we have f(x) > g(x)
 
-  -- -- By continuity, f - g is continuous
-  -- have h_cont : Continuous (f - g) := hf.sub hg
+    -- Find a value c strictly between g(x) and f(x)
+    obtain ⟨c, hgc, hcf⟩ := ENNReal.lt_iff_exists_nnreal_btwn.mp h_not
 
-  -- -- Find an open neighborhood where f - g > 0
-  -- obtain ⟨U, hU_open, hx_mem, hU_pos⟩ :=
-  --   isOpen_compl_zeros_of_continuous h_cont ⟨x, h_pos.ne'⟩
+    -- Use level sets which are continuous
+    let U := {y | c < f y} ∩ {y | g y < c}
 
-  -- -- This neighborhood has positive measure
-  -- have hU_meas : 0 < μ U := IsOpenPosMeasure.open_pos hU_open ⟨x, hx_mem⟩
+    have hU_open : IsOpen U := by
+      apply IsOpen.inter
+      · exact isOpen_lt continuous_const f.continuous
+      · exact isOpen_lt g.continuous continuous_const
 
-  -- -- But on this set, f > g, contradicting the ae inequality
-  -- have h_contra : ∀ y ∈ U, g y < f y := fun y hy => by
-  --   have : (f - g) y ≠ 0 := hU_pos hy
-  --   have : 0 ≤ (f - g) y := by
-  --     by_contra h_neg
-  --     push_neg at h_neg
-  --     -- This would contradict h_ae on the set U which has positive measure
-  --     have : f y < g y := by linarith [h_neg]
-  --     -- Extract contradiction from ae inequality
-  --     sorry
-  --   linarith [this, this.lt_of_ne this.symm]
+    have hx_mem : x ∈ U := ⟨hcf, hgc⟩
 
-  -- -- This contradicts f ≤ g almost everywhere since U has positive measure
-  -- have h_meas_contra : μ {y | g y < f y} > 0 := by
-  --   refine lt_of_lt_of_le hU_meas ?_
-  --   exact measure_mono (fun y hy => h_contra y hy)
+    have hU_meas : 0 < (ν.map (∂μ/∂ν)) U := by
+      exact IsOpen.measure_pos (Measure.map (∂μ/∂ν) ν) hU_open (nonempty_of_mem hx_mem)
 
-  -- -- But f ≤ g ae means μ {y | g y < f y} = 0
-  -- have h_ae_zero : μ {y | g y < f y} = 0 := by
-  --   have : {y | g y < f y} = {y | ¬ f y ≤ g y} := by ext; simp [not_le]
-  --   rw [this]
-  --   exact measure_zero_of_ae_nmem h_ae
+    have h_contra : ∀ y ∈ U, g y < f y := fun y ⟨hfy, hgy⟩ => hgy.trans hfy
 
-  -- linarith [h_meas_contra, h_ae_zero]
+    have h_meas_contra : (ν.map (∂μ/∂ν)) {y | g y < f y} > 0 := by
+      refine lt_of_lt_of_le hU_meas ?_
+      exact measure_mono (fun y hy => h_contra y hy)
 
-lemma derivAtTop_mono (hfg : f ≤ᵐ[ν.map (∂μ/∂ν)] g) : f.derivAtTop ≤ g.derivAtTop := by
-  have h_le : f.toFun ≤ g.toFun := continuous_ae_le_imp_le hfg
+    have h_ae_zero : (ν.map (∂μ/∂ν)) {y | g y < f y} = 0 := by
+      have : {y | g y < f y} = {y | ¬ f y ≤ g y} := by ext; simp
+      rw [this]
+      exact h_leq
+
+    exact h_meas_contra.ne h_ae_zero.symm
+
+lemma derivAtTop_mono [Measure.IsOpenPosMeasure (ν.map (∂μ/∂ν))] (hfg : f ≤ᵐ[ν.map (∂μ/∂ν)] g) : f.derivAtTop ≤ g.derivAtTop := by
+  have h_le : f.toFun ≤ g.toFun := continuous_ae_le_iff_le.mp hfg
   have hf : Tendsto (fun x ↦ f x / x) atTop (𝓝 f.derivAtTop) := DivFunction.tendsto_derivAtTop
   have hg : Tendsto (fun x ↦ g x / x) atTop (𝓝 g.derivAtTop) := DivFunction.tendsto_derivAtTop
   have h_le : ∀ᶠ x in atTop, f x / x ≤ g x / x := by
@@ -843,7 +839,7 @@ lemma derivAtTop_mono (hfg : f ≤ᵐ[ν.map (∂μ/∂ν)] g) : f.derivAtTop �
     exact ENNReal.div_le_div_right (h_le x) x
   exact le_of_tendsto_of_tendsto hf hg h_le
 
-lemma fDiv_mono (hfg : f ≤ᵐ[ν.map (∂μ/∂ν)] g) : fDiv f μ ν ≤ fDiv g μ ν := by
+lemma fDiv_mono [Measure.IsOpenPosMeasure (ν.map (∂μ/∂ν))] (hfg : f ≤ᵐ[ν.map (∂μ/∂ν)] g) : fDiv f μ ν ≤ fDiv g μ ν := by
   have hd : f.derivAtTop ≤ g.derivAtTop := derivAtTop_mono hfg
   exact fDiv_mono'' hfg hd
 
