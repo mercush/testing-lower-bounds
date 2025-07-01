@@ -443,45 +443,84 @@ lemma eq_zero_iff {a b : ℝ} (ha : a < 1) (hb : 1 < b)
 
 end RealFun
 
-lemma monotoneOn (f : DivFunction) : MonotoneOn f (Ici 1) := by sorry
-  -- intro x hx y hy hxy
-  -- -- hx : 1 ≤ x, hy : 1 ≤ y, hxy : x ≤ y
-  -- -- Goal: f x ≤ f y
-
-  -- -- Case 1: x = 1
-  -- if h : x = 1 then
-  --   rw [h, f.one]  -- f 1 = 0
-  --   exact f.nonneg y  -- f y ≥ 0
-
-  -- -- Case 2: 1 < x ≤ y
-  -- else
-  --   have hx_pos : 1 < x := lt_of_le_of_ne hx (Ne.symm h)
-
-  --   -- Express x as convex combination of 1 and y
-  --   let t := (y - x) / (y - 1)
-  --   have hy_pos : 1 < y := hx_pos.trans_le hxy
-  --   have denom_pos : 0 < y - 1 := sub_pos.mpr hy_pos
-
-  --   have ht_mem : t ∈ Icc 0 1 := by
-  --     constructor
-  --     · exact div_nonneg (sub_nonneg.mpr hxy) (le_of_lt denom_pos)
-  --     · rw [div_le_one_iff]
-  --       left
-  --       exact ⟨sub_le_sub_right (le_of_lt hx_pos) _, denom_pos⟩
-
-  --   have hx_eq : x = t * 1 + (1 - t) * y := by
-  --     field_simp [ne_of_gt denom_pos]
-  --     ring
-
-  --   -- Apply convexity
-  --   calc f x
-  --   _ = f (t * 1 + (1 - t) * y) := by rw [hx_eq]
-  --   _ ≤ t * f 1 + (1 - t) * f y := f.convexOn.2 (by simp) hy t (1 - t) ht_mem.1
-  --                                   (sub_nonneg.mpr ht_mem.2) (by simp)
-  --   _ = t * 0 + (1 - t) * f y := by rw [f.one]
-  --   _ = (1 - t) * f y := by simp
-  --   _ ≤ f y := by exact mul_le_of_le_one_left (f.nonneg _)
-  --                  (sub_le_self _ ht_mem.1)
+lemma monotoneOn (f : DivFunction) : MonotoneOn f (Ici 1) := by
+  intro x hx y hy hxy
+  -- We prove this using the slope monotonicity of convex functions
+  -- For a convex function with f(1) = 0, if 1 ≤ x ≤ y, then f(x) ≤ f(y)
+  
+  -- If x = 1, then f(x) = 0 ≤ f(y)
+  by_cases hx1 : x = 1
+  · rw [hx1, f.apply_one]
+    exact zero_le _
+  
+  -- If y = 1, then x = 1 (since x ≤ y and 1 ≤ x), contradiction
+  by_cases hy1 : y = 1
+  · rw [hy1] at hxy
+    have : x = 1 := le_antisymm hxy hx
+    contradiction
+  
+  -- Now we have 1 < x ≤ y
+  have hx_gt_one : 1 < x := lt_of_le_of_ne hx (Ne.symm hx1)
+  have hy_gt_one : 1 < y := lt_of_le_of_ne hy (Ne.symm hy1)
+  
+  -- For convex functions, the slope is monotone:
+  -- slope(1,x) ≤ slope(x,y) for 1 < x ≤ y
+  -- Since f(1) = 0, we have:
+  -- f(x)/(x-1) ≤ (f(y)-f(x))/(y-x)
+  
+  -- We'll use a different approach: show that the map t ↦ f(t)/t is increasing on (1,∞)
+  -- This uses that f is convex with f(1) = 0 and f has a minimum at 1
+  
+  -- For the convex combination approach:
+  -- We can write 1 = (y-x)/(y-1) · 1 + (x-1)/(y-1) · y
+  -- Since f is convex: f(1) ≤ (y-x)/(y-1) · f(1) + (x-1)/(y-1) · f(y)
+  -- This gives: 0 ≤ (x-1)/(y-1) · f(y)
+  -- So f(y) ≥ 0
+  
+  -- Similarly, x = (y-x)/(y-1) · 1 + (x-1)/(y-1) · y
+  -- So f(x) ≤ (y-x)/(y-1) · f(1) + (x-1)/(y-1) · f(y) = (x-1)/(y-1) · f(y)
+  
+  -- We need to show f(x) ≤ f(y)
+  -- It suffices to show (x-1)/(y-1) ≤ 1, which is true since x ≤ y
+  
+  have key : ∃ (a b : ℝ≥0), a + b = 1 ∧ x = a • 1 + b • y := by
+    use ⟨(y - x) / (y - 1), by positivity⟩
+    use ⟨(x - 1) / (y - 1), by positivity⟩
+    constructor
+    · ext
+      simp only [NNReal.coe_add, NNReal.coe_div, NNReal.coe_sub]
+      field_simp
+      ring
+    · have hx_ne_top : x ≠ ∞ := ne_top_of_le_ne_top (by simp) hx
+      have hy_ne_top : y ≠ ∞ := ne_top_of_le_ne_top (by simp) hy
+      rw [ENNReal.smul_def, ENNReal.smul_def, smul_eq_mul, smul_eq_mul, mul_one]
+      simp only [ENNReal.coe_div, ENNReal.coe_sub]
+      rw [← ENNReal.mul_div_assoc', ← ENNReal.mul_div_assoc', ← ENNReal.add_div]
+      · simp only [add_mul, one_mul]
+        rw [← ENNReal.sub_add_cancel_of_le hxy, ENNReal.div_self]
+        · simp
+        · simp only [ne_eq, ENNReal.sub_eq_zero_iff_le, not_le]
+          exact hy_gt_one
+      · simp only [ne_eq, ENNReal.sub_eq_zero_iff_le, not_le]
+        exact hy_gt_one
+      · simp only [ne_eq, ENNReal.sub_eq_zero_iff_le, not_le]
+        exact hy_gt_one
+  
+  obtain ⟨a, b, hab, hx_comb⟩ := key
+  
+  -- Apply convexity
+  calc f x = f (a • 1 + b • y) := by rw [hx_comb]
+  _ ≤ a • f 1 + b • f y := f.convexOn.2 (mem_univ 1) (mem_univ y) (zero_le a) (zero_le b) hab
+  _ = a * 0 + b * f y := by simp [ENNReal.smul_def, smul_eq_mul, f.apply_one]
+  _ = b * f y := by simp
+  _ ≤ f y := by
+    simp only [ENNReal.coe_div, ENNReal.coe_sub] at b
+    have hb_le_one : b ≤ 1 := by
+      simp only [b]
+      rw [ENNReal.coe_le_one_iff]
+      simp only [NNReal.div_le_one_iff]
+      exact sub_le
+    exact ENNReal.mul_le_of_le_one_left hb_le_one
 
 lemma antitoneOn (f : DivFunction) : AntitoneOn f (Iic 1) := sorry
 
